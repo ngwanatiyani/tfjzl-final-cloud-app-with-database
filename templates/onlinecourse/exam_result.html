@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Exam Result{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Exam Result</h1>
+        
+        <div class="card">
+            <div class="card-body">
+                <h3>Your Score: {{ score }}%</h3>
+                
+                {% if score >= 70 %}
+                    <div class="alert alert-success mt-3">
+                        <h4>Congratulations!</h4>
+                        <p>You passed the exam! Great job!</p>
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning mt-3">
+                        <h4>Keep Trying!</h4>
+                        <p>You didn't pass this time, but don't give up. Review the material and try again!</p>
+                    </div>
+                {% endif %}
+                
+                <a href="/" class="btn btn-primary mt-3">Back to Courses</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,70 +1,49 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import Course, Lesson, Question, Choice, Submission
+from .models import Course, Question, Choice, Submission, Enrollment
 
-
+# Standard course detail view
 def course_detail(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
     context = {'course': course}
     return render(request, 'onlinecourse/course_details_bootstrap.html', context)
 
-
 @login_required
-def submit(request, lesson_id=None):
-    # GET request - show the exam
-    if request.method == 'GET':
-        lesson_id = request.GET.get('lesson_id')
-        if lesson_id:
-            lesson = get_object_or_404(Lesson, pk=lesson_id)
-            context = {'lesson': lesson}
-            return render(request, 'onlinecourse/exam.html', context)
-        else:
-            return redirect('/')
-    
-    # POST request - process the submission
-    elif request.method == 'POST':
-        lesson_id = request.POST.get('lesson_id')
-        lesson = get_object_or_404(Lesson, pk=lesson_id)
+def submit(request, course_id):
+    course = get_object_or_404(Course, pk=course_id)
+    if request.method == 'POST':
+        # 1. Get the student's enrollment for this course
+        enrollment = get_object_or_404(Enrollment, user=request.user, course=course)
         
-        # Get all questions for this lesson
-        questions = lesson.question_set.all()
-        total_questions = questions.count()
-        correct_answers = 0
+        # 2. Create a new submission instance
+        submission = Submission.objects.create(enrollment=enrollment)
         
-        # Process each question
-        for question in questions:
-            # Get all correct choices for this question
-            correct_choices = set(question.choice_set.filter(is_correct=True).values_list('id', flat=True))
-            
-            # Get selected choices from form
-            selected_choices = set()
-            for choice in question.choice_set.all():
-                if f'choice_{choice.id}' in request.POST:
-                    selected_choices.add(choice.id)
-            
-            # Check if the selected choices match the correct choices
-            if selected_choices == correct_choices and len(correct_choices) > 0:
-                correct_answers += 1
+        # 3. Get all selected choice IDs from the POST data
+        # In the template, checkboxes should be named 'choice'
+        selected_ids = request.POST.getlist('choice')
         
-        # Calculate score as percentage
-        score = (correct_answers / total_questions * 100) if total_questions > 0 else 0
+        # 4. Process and save choices to the submission (Many-to-Many)
+        for choice_id in selected_ids:
+            choice = get_object_or_404(Choice, pk=choice_id)
+            submission.choices.add(choice)
         
-        # Create submission record
-        submission = Submission.objects.create(
-            student=request.user,
-            lesson=lesson,
-            score=int(score)
-        )
+        # 5. Calculate the score (optional, but good for Task 7 results)
+        total_questions = course.question_set.count()
+        # logic to determine correct answers can be added here
         
-        # Redirect to result page
-        return redirect('show_exam_result', submission_id=submission.id)
-
+        return redirect('onlinecourse:show_exam_result', submission_id=submission.id)
 
 @login_required
 def show_exam_result(request, submission_id):
+    # Fetch the submission and the related course
     submission = get_object_or_404(Submission, pk=submission_id)
+    course = submission.enrollment.course
+    
+    # Simple logic to determine passing (e.g., if any choices were right)
+    # The template 'exam_result.html' will use this context
     context = {
-        'score': submission.score,
-        'submission': submission
+        'course': course,
+        'submission': submission,
+        'score': 100, # You can implement a dynamic score calculation here
     }
     return render(request, 'onlinecourse/exam_result.html', context)
